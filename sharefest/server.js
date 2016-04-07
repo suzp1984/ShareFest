@@ -1,5 +1,7 @@
 var express = require('express');
 var app = express();
+var compression = require('compression');
+
 var ws = require('../core/transport/WebSocketServer.js');
 
 var config = require('../serverConfig.json');
@@ -24,24 +26,26 @@ if (process.env.REQUIRE_HTTPS) {
     });
 }
 
-app.use(express.json());
-app.use(express.compress());
+var bodyParser = require('body-parser');
+
+app.use(bodyParser.json());
+app.use(compression());
 app.use(allowCrossDomain);
 app.use(express.static(__dirname + '/public'));
 
 var server;
 var wsPort;
 
-app.configure('development', function () {
-    app.use(express.errorHandler({ dumpExceptions:true, showStack:true }));
+var env = process.env.NODE_ENV || 'development';
+if ('development' == env) {
+    var errorhandler = require('errorhandler')
+    app.use(errorhandler({ dumpExceptions:true, showStack:true }));
     console.log('listening to port 13337');
     server = app.listen(13337);
     ws.instance.start(tracker.instance, server, null, config.clientTimeout);
 //    signaling.start(server);
     console.log('here I am');
-});
-
-app.configure('production', function () {
+} else {
     var options = {
         // Important: the following crt and key files are insecure
         // replace the following files with your own keys
@@ -60,7 +64,7 @@ app.configure('production', function () {
     server = https.createServer(options, app).listen(443);
 
     ws.instance.start(tracker.instance, server, null, config.clientTimeout);
-//    signaling.start(server);
-});
+    //    signaling.start(server);
+}
 
 router.configure(app, __dirname);
